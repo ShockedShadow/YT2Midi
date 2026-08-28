@@ -1,16 +1,12 @@
-// Comprehensive 88-Key Roblox Piano QWERTY Mapping Engine
-// Based explicitly on image_0.png layout. Transposition must be 0.
+// Exact 88-Key Roblox Piano QWERTY Mapping Engine (Transposition = 0)
 document.addEventListener('DOMContentLoaded', () => {
-    const convertBtn = document.getElementById('convert-btn');
-    const ytUrlInput = document.getElementById('yt-url');
-    const loader = document.getElementById('loader');
+    const fileInput = document.getElementById('midi-file-input');
     const outputSection = document.getElementById('output-section');
     const sheetOutput = document.getElementById('sheet-output');
     const copyBtn = document.getElementById('copy-btn');
     const copyText = document.getElementById('copy-text');
 
-    // The exact mapping derived from image_0.png.
-    // It spans 7 octaves using numbers, symbols, and letters.
+    // Exact mapping derived directly from your provided in-game screenshot layout
     const robloxNotesMap = {
         // --- Octave 1 (Lowest) ---
         21: '1', 22: '3', 23: '4', 24: '6', 25: '8', 26: '9',
@@ -21,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Octave 3 ---
         47: 'S', 48: 'D', 49: 'F', 50: 'G', 51: 'H', 52: 'J', 53: 'K',
         54: 'L', 55: 'Z', 56: 'X', 57: 'C', 58: 'V', 59: 'B', 60: 'N',
-        // --- Octave 4 (Middle C) ---
+        // --- Octave 4 (Middle C Range) ---
         61: '1', 62: '2', 63: '3', 64: '4', 65: '5', 66: '6', 67: '7',
         68: '8', 69: '9', 70: '0', 71: 'q', 72: 'w', 73: 'e', 74: 'r',
         // --- Octave 5 ---
@@ -34,52 +30,72 @@ document.addEventListener('DOMContentLoaded', () => {
         103: 'j', 104: 'y', 105: 'i', 106: 'a', 107: 'd', 108: 'g'
     };
 
-    convertBtn.addEventListener('click', async () => {
-        const url = ytUrlInput.value.trim();
-        if (!url) {
-            alert('Please paste a valid YouTube link first!');
-            return;
-        }
+    if (fileInput) {
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
 
-        const videoId = extractYouTubeId(url);
-        if (!videoId) {
-            alert('Invalid YouTube URL format. Please check the link.');
-            return;
-        }
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                // Parse MIDI file using Tone.js Midi parser
+                const midi = new Midi(arrayBuffer);
+                
+                let sheetResult = '';
+                let notesByTime = {};
 
-        loader.classList.remove('hidden');
-        outputSection.classList.add('hidden');
-        convertBtn.disabled = true;
+                // Group notes played simultaneously into chords based on timestamp
+                midi.tracks.forEach(track => {
+                    track.notes.forEach(note => {
+                        // Round time slightly to group simultaneous notes into chords
+                        const timeKey = Math.round(note.time * 25) / 25; 
+                        if (!notesByTime[timeKey]) {
+                            notesByTime[timeKey] = [];
+                        }
+                        if (robloxNotesMap[note.midi]) {
+                            notesByTime[timeKey].push(robloxNotesMap[note.midi]);
+                        }
+                    });
+                });
 
-        try {
-            // --- IMPORTANT LIMITATION NOTICE ---
-            // Because you are on GitHub Pages (static only), you cannot run a server to 
-            // download and analyze YouTube audio. This code successfully maps MIDI to QWERTY 
-            // based on the image, but you need an *actual* MIDI file to convert. 
-            // Since you cannot upload a file in this UI, I am stopping the simulation 
-            // and providing instructions below on how to proceed.
+                // Sort timestamps sequentially
+                const sortedTimes = Object.keys(notesByTime).sort((a, b) => a - b);
+                let chordChunks = [];
 
-            alert("ERROR: Cannot fetch audio from YouTube on static GitHub Pages. See instructions in the code comments to implement MIDI file upload.");
-            
-            // --- The following lines are disabled because there is no audio source ---
-            // await new Promise(resolve => setTimeout(resolve, 1000));
-            // const generatedSheet = "MAPPING_LOADED_BUT_NO_AUDIO_SOURCE"; 
-            // sheetOutput.value = generatedSheet;
-            // outputSection.classList.remove('hidden');
+                sortedTimes.forEach(time => {
+                    const keys = notesByTime[time];
+                    if (keys.length > 0) {
+                        if (keys.length > 1) {
+                            // Format chords with brackets [] as seen in Roblox sheets
+                            chordChunks.push(`[${keys.join('')}]`);
+                        } else {
+                            chordChunks.push(keys[0]);
+                        }
+                    }
+                });
 
-            loader.classList.add('hidden');
-        } catch (err) {
-            console.error(err);
-            alert('Error processing the requested video stream.');
-            loader.classList.add('hidden');
-        } finally {
-            convertBtn.disabled = false;
-        }
-    });
+                // Group text nicely into lines for readability
+                for (let i = 0; i < chordChunks.length; i += 12) {
+                    sheetResult += chordChunks.slice(i, i + 12).join(' ') + '\n';
+                }
 
-    function extractYouTubeId(url) {
-        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-        const match = url.match(regExp);
-        return (match && match[2].length === 11) ? match[2] : null;
+                sheetOutput.value = sheetResult.trim() || "No mappable piano notes found in this MIDI track range.";
+                outputSection.classList.remove('hidden');
+
+            } catch (err) {
+                console.error(err);
+                alert('Error parsing the MIDI file. Make sure it is a valid .mid file.');
+            }
+        });
+    }
+
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            sheetOutput.select();
+            document.execCommand('copy');
+            copyText.textContent = 'Copied!';
+            setTimeout(() => {
+                copyText.textContent = 'Copy Sheet';
+            }, 2000);
+        });
     }
 });
