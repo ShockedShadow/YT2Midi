@@ -1,4 +1,4 @@
-// YT2Midi - Exact Roblox Visual Layout Mapping Engine
+// YT2Midi - Direct Visual Dictionary Mapping Engine
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('midi-file-input');
     const outputSection = document.getElementById('output-section');
@@ -6,15 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyBtn = document.getElementById('copy-btn');
     const copyText = document.getElementById('copy-text');
 
-    // Exact array corresponding 1-to-1 with the 48 sequential keys shown in your Roblox layout image (Left to Right)
-    const robloxKeyLayout = [
-        '1', '3', '4', '6', '8', '9', 'q', 'e', 't', // Lower sharp/flat tier segment 1
-        '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'z', 'x', 'c', 'v', 'b', 'n', 'm',
-        'u', 'o', 'p', 's', 'f', 'h', 'j' // Upper modifier tier
-    ];
-
-    // Corresponding MIDI note values mapped to the physical sequence layout width
-    const baseMidiStart = 36; // Starts at C2 / Low C
+    // Direct dictionary mapping standard MIDI piano keys to your exact Roblox visual layout
+    const exactRobloxMap = {
+        // Octave 1-2 (Lower Register)
+        36: '1', 37: '2', 38: '3', 39: '4', 40: '5', 41: '6', 42: '7', 43: '8', 44: '9', 45: '0',
+        46: 'q', 47: 'w', 48: 'e', 49: 'r', 50: 't', 51: 'y', 52: 'u', 53: 'i', 54: 'o', 55: 'p',
+        // Octave 3-4 (Middle Register)
+        56: 'a', 57: 's', 58: 'd', 59: 'f', 60: 'g', 61: 'h', 62: 'j', 63: 'k', 64: 'l',
+        65: 'z', 66: 'x', 67: 'c', 68: 'v', 69: 'b', 70: 'n', 71: 'm',
+        // Octave 5-6 (Upper Register & Modifiers)
+        72: 'u', 73: 'o', 74: 'p', 75: 's', 76: 'f', 77: 'h', 78: 'j',
+        79: '1', 81: '3', 83: '4', 85: '6', 87: '8', 88: '9', 89: 'q', 91: 'e', 93: 't'
+    };
 
     if (fileInput) {
         fileInput.addEventListener('change', async (e) => {
@@ -27,28 +30,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 let notesByTime = {};
 
-                // Parse all tracks and align notes directly to the layout indexes
+                // Parse all tracks using the dictionary map
                 midi.tracks.forEach(track => {
                     track.notes.forEach(note => {
                         let midiNote = note.midi;
 
-                        // Calculate relative position against the visual layout range
-                        let layoutIndex = midiNote - baseMidiStart;
+                        // Bring deep bass or high treble notes safely into the mapped lookup range
+                        while (midiNote < 36) midiNote += 12;
+                        while (midiNote > 93) midiNote -= 12;
 
-                        // Constrain index safely within the exact bounds of the Roblox keyboard array
-                        if (layoutIndex >= 0 && layoutIndex < robloxKeyLayout.length) {
-                            const mappedChar = robloxKeyLayout[layoutIndex];
+                        const mappedChar = exactRobloxMap[midiNote];
 
-                            // Quantize time into 0.05s windows to capture simultaneous chords accurately
-                            const timeKey = Math.round(note.time * 20) / 20;
+                        // Quantize timestamps into 0.05s steps to capture clean chords
+                        const timeKey = Math.round(note.time * 20) / 20;
 
-                            if (!notesByTime[timeKey]) {
-                                notesByTime[timeKey] = [];
-                            }
+                        if (!notesByTime[timeKey]) {
+                            notesByTime[timeKey] = [];
+                        }
 
-                            if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
-                                notesByTime[timeKey].push(mappedChar);
-                            }
+                        if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
+                            notesByTime[timeKey].push(mappedChar);
                         }
                     });
                 });
@@ -67,18 +68,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Format text cleanly into rows of 16 blocks for in-game pasting
+                // Format text neatly into chunks of 16 for easy in-game copy-pasting
                 let sheetResult = '';
                 for (let i = 0; i < chordChunks.length; i += 16) {
                     sheetResult += chordChunks.slice(i, i + 16).join(' ') + '\n';
                 }
 
-                sheetOutput.value = sheetResult.trim() || "No notes fell within the visual keyboard range. Try a different MIDI file.";
+                sheetOutput.value = sheetResult.trim() || "No notes were matched. Try uploading a different solo piano MIDI file.";
                 outputSection.classList.remove('hidden');
 
             } catch (err) {
                 console.error(err);
-                alert('Error parsing MIDI file.');
+                alert('Error parsing the MIDI file.');
             }
         });
     }
