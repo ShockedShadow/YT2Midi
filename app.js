@@ -1,4 +1,4 @@
-// YT2Midi - Direct Virtual Piano / Roblox Mapping Engine
+// YT2Midi - Exact Roblox Visual Layout Mapping Engine
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('midi-file-input');
     const outputSection = document.getElementById('output-section');
@@ -6,17 +6,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyBtn = document.getElementById('copy-btn');
     const copyText = document.getElementById('copy-text');
 
-    // Standard Virtual Piano character mapping array (Covers 3 full octaves cleanly)
-    // Lower case = natural keys, brackets = chords
-    const vpMap = {
-        // Octave 3 (Low)
-        48: 'z', 50: 'x', 52: 'c', 53: 'v', 55: 'b', 57: 'n', 59: 'm',
-        // Octave 4 (Middle C)
-        60: '1', 62: '2', 64: '3', 65: '4', 67: '5', 69: '6', 71: '7',
-        72: 't', 74: 'y', 76: 'u', 77: 'i', 79: 'o', 81: 'p', 83: 'a',
-        // Octave 5 (High)
-        84: 's', 86: 'd', 88: 'f', 89: 'g', 91: 'h', 93: 'j', 95: 'k'
-    };
+    // Exact array corresponding 1-to-1 with the 48 sequential keys shown in your Roblox layout image (Left to Right)
+    const robloxKeyLayout = [
+        '1', '3', '4', '6', '8', '9', 'q', 'e', 't', // Lower sharp/flat tier segment 1
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', 'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'z', 'x', 'c', 'v', 'b', 'n', 'm',
+        'u', 'o', 'p', 's', 'f', 'h', 'j' // Upper modifier tier
+    ];
+
+    // Corresponding MIDI note values mapped to the physical sequence layout width
+    const baseMidiStart = 36; // Starts at C2 / Low C
 
     if (fileInput) {
         fileInput.addEventListener('change', async (e) => {
@@ -29,33 +27,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 let notesByTime = {};
 
-                // Parse all tracks, pulling only notes that fit within the playable range
+                // Parse all tracks and align notes directly to the layout indexes
                 midi.tracks.forEach(track => {
                     track.notes.forEach(note => {
                         let midiNote = note.midi;
 
-                        // Shift octaves up or down if the song is out of range
-                        while (midiNote < 48) midiNote += 12;
-                        while (midiNote > 95) midiNote -= 12;
+                        // Calculate relative position against the visual layout range
+                        let layoutIndex = midiNote - baseMidiStart;
 
-                        // Quantize time into 0.05s steps to capture simultaneous chords accurately
-                        const timeKey = Math.round(note.time * 20) / 20;
+                        // Constrain index safely within the exact bounds of the Roblox keyboard array
+                        if (layoutIndex >= 0 && layoutIndex < robloxKeyLayout.length) {
+                            const mappedChar = robloxKeyLayout[layoutIndex];
 
-                        if (!notesByTime[timeKey]) {
-                            notesByTime[timeKey] = [];
-                        }
+                            // Quantize time into 0.05s windows to capture simultaneous chords accurately
+                            const timeKey = Math.round(note.time * 20) / 20;
 
-                        // Find closest mapped note
-                        let mappedChar = vpMap[midiNote];
-                        if (!mappedChar) {
-                            // Fallback to nearest neighbor if exact match missing
-                            let keys = Object.keys(vpMap).map(Number);
-                            let closest = keys.reduce((prev, curr) => Math.abs(curr - midiNote) < Math.abs(prev - midiNote) ? curr : prev);
-                            mappedChar = vpMap[closest];
-                        }
+                            if (!notesByTime[timeKey]) {
+                                notesByTime[timeKey] = [];
+                            }
 
-                        if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
-                            notesByTime[timeKey].push(mappedChar);
+                            if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
+                                notesByTime[timeKey].push(mappedChar);
+                            }
                         }
                     });
                 });
@@ -74,13 +67,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Format text cleanly into rows of 16 blocks
+                // Format text cleanly into rows of 16 blocks for in-game pasting
                 let sheetResult = '';
                 for (let i = 0; i < chordChunks.length; i += 16) {
                     sheetResult += chordChunks.slice(i, i + 16).join(' ') + '\n';
                 }
 
-                sheetOutput.value = sheetResult.trim() || "No valid notes found.";
+                sheetOutput.value = sheetResult.trim() || "No notes fell within the visual keyboard range. Try a different MIDI file.";
                 outputSection.classList.remove('hidden');
 
             } catch (err) {
@@ -95,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sheetOutput.select();
             document.execCommand('copy');
             copyText.textContent = 'Copied!';
-            setTimeout => {
+            setTimeout(() => {
                 copyText.textContent = 'Copy Sheet';
             }, 2000);
         });
