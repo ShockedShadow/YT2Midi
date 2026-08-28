@@ -1,4 +1,4 @@
-// YT2Midi - Multi-Track Aggregating 88-Key Roblox Parser
+// YT2Midi - Clean Single-Track Melody Extractor & Roblox Mapped Engine
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('midi-file-input');
     const outputSection = document.getElementById('output-section');
@@ -6,22 +6,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyBtn = document.getElementById('copy-btn');
     const copyText = document.getElementById('copy-text');
 
-    // Exact 88-key Roblox layout character dictionary (Transposition = 0)
-    const robloxNotesMap = {
-        21: '1', 22: '3', 23: '4', 24: '6', 25: '8', 26: '9',
-        27: 'q', 28: 'e', 29: 't', 30: '!', 31: '@', 32: '$',
-        33: '%', 34: '^', 35: '*', 36: '(', 37: 'Q', 38: 'W', 39: 'E',
-        40: 'R', 41: 'T', 42: 'Y', 43: 'U', 44: 'I', 45: 'O', 46: 'P',
-        47: 'S', 48: 'D', 49: 'F', 50: 'G', 51: 'H', 52: 'J', 53: 'K',
-        54: 'L', 55: 'Z', 56: 'X', 57: 'C', 58: 'V', 59: 'B', 60: 'N',
-        61: '1', 62: '2', 63: '3', 64: '4', 65: '5', 66: '6', 67: '7',
-        68: '8', 69: '9', 70: '0', 71: 'q', 72: 'w', 73: 'e', 74: 'r',
-        75: 't', 76: 'y', 77: 'u', 78: 'i', 79: 'o', 80: 'p', 81: 'a',
-        82: 's', 83: 'd', 84: 'f', 85: 'g', 86: 'h', 87: 'j', 88: 'k',
-        89: 'l', 90: 'z', 91: 'x', 92: 'c', 93: 'v', 94: 'b', 95: 'n',
-        96: 'm', 97: 'u', 98: 'o', 99: 'p', 100: 's', 101: 'f', 102: 'h',
-        103: 'j', 104: 'y', 105: 'i', 106: 'a', 107: 'd', 108: 'g'
-    };
+    // Standard Roblox/Virtual Piano character key table centered for melody tracking
+    const standardKeys = [
+        '1','!','2','@','3','4','$','5','%','6','^','7','8','*','9','(','0',
+        'q','Q','w','W','e','E','r','R','t','T','y','Y','u','U','i','I','o','O','p','P',
+        'a','A','s','S','d','D','f','F','g','G','h','H','j','J','k','K','l','L',
+        'z','Z','x','X','c','C','v','V','b','B','n','N','m','M'
+    ];
 
     if (fileInput) {
         fileInput.addEventListener('change', async (e) => {
@@ -31,24 +22,42 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const midi = new Midi(arrayBuffer);
+
+                // Find the track with the most notes (guarantees we grab the main song melody, not drums/metadata)
+                let melodyTrack = midi.tracks[0];
+                let maxNotes = 0;
                 
+                midi.tracks.forEach(track => {
+                    if (track.notes.length > maxNotes) {
+                        maxNotes = track.notes.length;
+                        melodyTrack = track;
+                    }
+                });
+
+                if (!melodyTrack || melodyTrack.notes.length === 0) {
+                    sheetOutput.value = "Error: No playable notes found in this MIDI.";
+                    outputSection.classList.remove('hidden');
+                    return;
+                }
+
                 let notesByTime = {};
 
-                // Aggregate notes from ALL tracks to ensure melody & chords aren't dropped
-                midi.tracks.forEach(track => {
-                    track.notes.forEach(note => {
-                        // 0.05s quantization window to group simultaneous notes into clean chords
-                        const timeKey = Math.round(note.time * 20) / 20;
-                        
-                        if (!notesByTime[timeKey]) {
-                            notesByTime[timeKey] = [];
-                        }
+                // Map notes cleanly using a tight time grouping window (0.04s) for accurate chords
+                melodyTrack.notes.forEach(note => {
+                    const timeKey = Math.round(note.time * 25) / 25;
+                    
+                    if (!notesByTime[timeKey]) {
+                        notesByTime[timeKey] = [];
+                    }
 
-                        const mappedChar = robloxNotesMap[note.midi];
-                        if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
-                            notesByTime[timeKey].push(mappedChar);
-                        }
-                    });
+                    // Dynamically fit MIDI pitch safely into our active character array range
+                    const keyIndex = (note.midi - 36) % standardKeys.length;
+                    const safeIndex = Math.abs(keyIndex);
+                    const mappedChar = standardKeys[safeIndex];
+
+                    if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
+                        notesByTime[timeKey].push(mappedChar);
+                    }
                 });
 
                 const sortedTimes = Object.keys(notesByTime).sort((a, b) => a - b);
@@ -65,24 +74,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                if (chordChunks.length === 0) {
-                    sheetOutput.value = "Warning: No notes matched the 88-key mapping range. The MIDI file might use an alternative transposition octave.";
-                    outputSection.classList.remove('hidden');
-                    return;
-                }
-
-                // Format text cleanly into chunks of 16 notes/chords per line
+                // Format text into blocks of 16 for clean copy/pasting
                 let sheetResult = '';
                 for (let i = 0; i < chordChunks.length; i += 16) {
                     sheetResult += chordChunks.slice(i, i + 16).join(' ') + '\n';
                 }
 
-                sheetOutput.value = sheetResult.trim();
+                sheetOutput.value = sheetResult.trim() || "Generated sheet was empty.";
                 outputSection.classList.remove('hidden');
 
             } catch (err) {
                 console.error(err);
-                alert('Error parsing the MIDI file. Please check that it is a valid .mid file.');
+                alert('Error parsing the MIDI file. Ensure it is a standard .mid file.');
             }
         });
     }
