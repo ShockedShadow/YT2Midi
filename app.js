@@ -1,4 +1,4 @@
-// Exact 88-Key Roblox Piano QWERTY Mapping Engine (Transposition = 0)
+// YT2Midi - Optimized 88-Key MIDI Parser Engine
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('midi-file-input');
     const outputSection = document.getElementById('output-section');
@@ -6,27 +6,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyBtn = document.getElementById('copy-btn');
     const copyText = document.getElementById('copy-text');
 
-    // Exact mapping derived directly from your provided in-game screenshot layout
+    // Exact mapping matching your 88-key layout (Transposition = 0)
     const robloxNotesMap = {
-        // --- Octave 1 (Lowest) ---
         21: '1', 22: '3', 23: '4', 24: '6', 25: '8', 26: '9',
         27: 'q', 28: 'e', 29: 't', 30: '!', 31: '@', 32: '$',
-        // --- Octave 2 ---
         33: '%', 34: '^', 35: '*', 36: '(', 37: 'Q', 38: 'W', 39: 'E',
         40: 'R', 41: 'T', 42: 'Y', 43: 'U', 44: 'I', 45: 'O', 46: 'P',
-        // --- Octave 3 ---
         47: 'S', 48: 'D', 49: 'F', 50: 'G', 51: 'H', 52: 'J', 53: 'K',
         54: 'L', 55: 'Z', 56: 'X', 57: 'C', 58: 'V', 59: 'B', 60: 'N',
-        // --- Octave 4 (Middle C Range) ---
         61: '1', 62: '2', 63: '3', 64: '4', 65: '5', 66: '6', 67: '7',
         68: '8', 69: '9', 70: '0', 71: 'q', 72: 'w', 73: 'e', 74: 'r',
-        // --- Octave 5 ---
         75: 't', 76: 'y', 77: 'u', 78: 'i', 79: 'o', 80: 'p', 81: 'a',
         82: 's', 83: 'd', 84: 'f', 85: 'g', 86: 'h', 87: 'j', 88: 'k',
-        // --- Octave 6 ---
         89: 'l', 90: 'z', 91: 'x', 92: 'c', 93: 'v', 94: 'b', 95: 'n',
         96: 'm', 97: 'u', 98: 'o', 99: 'p', 100: 's', 101: 'f', 102: 'h',
-        // --- Octave 7 (Highest) ---
         103: 'j', 104: 'y', 105: 'i', 106: 'a', 107: 'd', 108: 'g'
     };
 
@@ -37,27 +30,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 const arrayBuffer = await file.arrayBuffer();
-                // Parse MIDI file using Tone.js Midi parser
                 const midi = new Midi(arrayBuffer);
                 
                 let sheetResult = '';
                 let notesByTime = {};
 
-                // Group notes played simultaneously into chords based on timestamp
+                // Find the track with the most notes (usually the primary melody track)
+                // This prevents background drums or multi-channel clutter from ruining the sheet.
+                let activeTrack = midi.tracks[0];
+                let maxNotes = 0;
+                
                 midi.tracks.forEach(track => {
-                    track.notes.forEach(note => {
-                        // Round time slightly to group simultaneous notes into chords
-                        const timeKey = Math.round(note.time * 25) / 25; 
-                        if (!notesByTime[timeKey]) {
-                            notesByTime[timeKey] = [];
-                        }
-                        if (robloxNotesMap[note.midi]) {
-                            notesByTime[timeKey].push(robloxNotesMap[note.midi]);
-                        }
-                    });
+                    if (track.notes.length > maxNotes) {
+                        maxNotes = track.notes.length;
+                        activeTrack = track;
+                    }
                 });
 
-                // Sort timestamps sequentially
+                if (!activeTrack || activeTrack.notes.length === 0) {
+                    sheetOutput.value = "Error: No notes found in this MIDI track.";
+                    outputSection.classList.remove('hidden');
+                    return;
+                }
+
+                // Map notes based on precise timing quantization (50ms window for chord accuracy)
+                activeTrack.notes.forEach(note => {
+                    const timeKey = Math.round(note.time * 20) / 20; 
+                    if (!notesByTime[timeKey]) {
+                        notesByTime[timeKey] = [];
+                    }
+                    if (robloxNotesMap[note.midi]) {
+                        // Prevent duplicate keys inside the exact same chord tick
+                        if (!notesByTime[timeKey].includes(robloxNotesMap[note.midi])) {
+                            notesByTime[timeKey].push(robloxNotesMap[note.midi]);
+                        }
+                    }
+                });
+
                 const sortedTimes = Object.keys(notesByTime).sort((a, b) => a - b);
                 let chordChunks = [];
 
@@ -65,7 +74,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const keys = notesByTime[time];
                     if (keys.length > 0) {
                         if (keys.length > 1) {
-                            // Format chords with brackets [] as seen in Roblox sheets
                             chordChunks.push(`[${keys.join('')}]`);
                         } else {
                             chordChunks.push(keys[0]);
@@ -73,15 +81,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Group text nicely into lines for readability
-                for (let i = 0; i < chordChunks.length; i += 12) {
-                    sheetResult += chordChunks.slice(i, i + 12).join(' ') + '\n';
+                // Format nicely into 16 chords per line
+                for (let i = 0; i < chordChunks.length; i += 16) {
+                    sheetResult += chordChunks.slice(i, i + 16).join(' ') + '\n';
                 }
 
-                sheetOutput.value = sheetResult.trim() || "No mappable piano notes found in this MIDI track range.";
+                sheetOutput.value = sheetResult.trim() || "No mappable piano notes found within the 88-key range.";
                 outputSection.classList.remove('hidden');
 
-            } catch (err) {
+            }Cry catch (err) {
                 console.error(err);
                 alert('Error parsing the MIDI file. Make sure it is a valid .mid file.');
             }
