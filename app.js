@@ -1,4 +1,4 @@
-// YT2Midi - Clean Single-Track Melody Extractor & Roblox Mapped Engine
+// YT2Midi - Direct Virtual Piano / Roblox Mapping Engine
 document.addEventListener('DOMContentLoaded', () => {
     const fileInput = document.getElementById('midi-file-input');
     const outputSection = document.getElementById('output-section');
@@ -6,13 +6,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyBtn = document.getElementById('copy-btn');
     const copyText = document.getElementById('copy-text');
 
-    // Standard Roblox/Virtual Piano character key table centered for melody tracking
-    const standardKeys = [
-        '1','!','2','@','3','4','$','5','%','6','^','7','8','*','9','(','0',
-        'q','Q','w','W','e','E','r','R','t','T','y','Y','u','U','i','I','o','O','p','P',
-        'a','A','s','S','d','D','f','F','g','G','h','H','j','J','k','K','l','L',
-        'z','Z','x','X','c','C','v','V','b','B','n','N','m','M'
-    ];
+    // Standard Virtual Piano character mapping array (Covers 3 full octaves cleanly)
+    // Lower case = natural keys, brackets = chords
+    const vpMap = {
+        // Octave 3 (Low)
+        48: 'z', 50: 'x', 52: 'c', 53: 'v', 55: 'b', 57: 'n', 59: 'm',
+        // Octave 4 (Middle C)
+        60: '1', 62: '2', 64: '3', 65: '4', 67: '5', 69: '6', 71: '7',
+        72: 't', 74: 'y', 76: 'u', 77: 'i', 79: 'o', 81: 'p', 83: 'a',
+        // Octave 5 (High)
+        84: 's', 86: 'd', 88: 'f', 89: 'g', 91: 'h', 93: 'j', 95: 'k'
+    };
 
     if (fileInput) {
         fileInput.addEventListener('change', async (e) => {
@@ -22,42 +26,38 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const arrayBuffer = await file.arrayBuffer();
                 const midi = new Midi(arrayBuffer);
-
-                // Find the track with the most notes (guarantees we grab the main song melody, not drums/metadata)
-                let melodyTrack = midi.tracks[0];
-                let maxNotes = 0;
                 
-                midi.tracks.forEach(track => {
-                    if (track.notes.length > maxNotes) {
-                        maxNotes = track.notes.length;
-                        melodyTrack = track;
-                    }
-                });
-
-                if (!melodyTrack || melodyTrack.notes.length === 0) {
-                    sheetOutput.value = "Error: No playable notes found in this MIDI.";
-                    outputSection.classList.remove('hidden');
-                    return;
-                }
-
                 let notesByTime = {};
 
-                // Map notes cleanly using a tight time grouping window (0.04s) for accurate chords
-                melodyTrack.notes.forEach(note => {
-                    const timeKey = Math.round(note.time * 25) / 25;
-                    
-                    if (!notesByTime[timeKey]) {
-                        notesByTime[timeKey] = [];
-                    }
+                // Parse all tracks, pulling only notes that fit within the playable range
+                midi.tracks.forEach(track => {
+                    track.notes.forEach(note => {
+                        let midiNote = note.midi;
 
-                    // Dynamically fit MIDI pitch safely into our active character array range
-                    const keyIndex = (note.midi - 36) % standardKeys.length;
-                    const safeIndex = Math.abs(keyIndex);
-                    const mappedChar = standardKeys[safeIndex];
+                        // Shift octaves up or down if the song is out of range
+                        while (midiNote < 48) midiNote += 12;
+                        while (midiNote > 95) midiNote -= 12;
 
-                    if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
-                        notesByTime[timeKey].push(mappedChar);
-                    }
+                        // Quantize time into 0.05s steps to capture simultaneous chords accurately
+                        const timeKey = Math.round(note.time * 20) / 20;
+
+                        if (!notesByTime[timeKey]) {
+                            notesByTime[timeKey] = [];
+                        }
+
+                        // Find closest mapped note
+                        let mappedChar = vpMap[midiNote];
+                        if (!mappedChar) {
+                            // Fallback to nearest neighbor if exact match missing
+                            let keys = Object.keys(vpMap).map(Number);
+                            let closest = keys.reduce((prev, curr) => Math.abs(curr - midiNote) < Math.abs(prev - midiNote) ? curr : prev);
+                            mappedChar = vpMap[closest];
+                        }
+
+                        if (mappedChar && !notesByTime[timeKey].includes(mappedChar)) {
+                            notesByTime[timeKey].push(mappedChar);
+                        }
+                    });
                 });
 
                 const sortedTimes = Object.keys(notesByTime).sort((a, b) => a - b);
@@ -74,18 +74,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-                // Format text into blocks of 16 for clean copy/pasting
+                // Format text cleanly into rows of 16 blocks
                 let sheetResult = '';
                 for (let i = 0; i < chordChunks.length; i += 16) {
                     sheetResult += chordChunks.slice(i, i + 16).join(' ') + '\n';
                 }
 
-                sheetOutput.value = sheetResult.trim() || "Generated sheet was empty.";
+                sheetOutput.value = sheetResult.trim() || "No valid notes found.";
                 outputSection.classList.remove('hidden');
 
             } catch (err) {
                 console.error(err);
-                alert('Error parsing the MIDI file. Ensure it is a standard .mid file.');
+                alert('Error parsing MIDI file.');
             }
         });
     }
@@ -95,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sheetOutput.select();
             document.execCommand('copy');
             copyText.textContent = 'Copied!';
-            setTimeout(() => {
+            setTimeout => {
                 copyText.textContent = 'Copy Sheet';
             }, 2000);
         });
