@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YT2Midi - MIDI to Roblox Sheet Converter</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Midi Parser Library CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
+    <script src="https://unpkg.com/@tonejs/midi"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between">
 
-    <!-- Header Navigation -->
     <header class="w-full border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -27,25 +25,22 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main class="max-w-4xl w-full mx-auto px-6 py-12 flex-grow flex flex-col items-center">
         <div class="text-center max-w-2xl mb-8">
             <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">MIDI to <span class="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Roblox 88-Key</span> Sheet</h1>
-            <p class="text-slate-400 text-sm">Upload your song's `.mid` file below. It will be converted instantly using your exact in-game 88-key layout (Transposition set to 0).</p>
+            <p class="text-slate-400 text-sm">Upload your song's `.mid` file below. It will convert instantly using your exact game key layout.</p>
         </div>
 
-        <!-- Uploader Box -->
         <div class="w-full bg-slate-900/80 border border-slate-800 rounded-2xl p-8 shadow-2xl backdrop-blur-xl">
             <div class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl p-8 text-center transition-all cursor-pointer relative" id="drop-zone">
                 <input type="file" id="midi-file-input" accept=".mid,.midi" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
                 <div class="flex flex-col items-center space-y-3 pointer-events-none">
                     <svg class="w-10 h-10 text-indigo-400" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
                     <p class="text-sm font-medium text-slate-200"><span class="text-indigo-400 font-semibold">Click to upload</span> or drag and drop your `.mid` file</p>
-                    <p class="text-xs text-slate-500">Supports standard MIDI files from YouTube video descriptions or repositories</p>
+                    <p class="text-xs text-slate-500">Supports standard piano MIDI files</p>
                 </div>
             </div>
 
-            <!-- Output Container -->
             <div id="output-section" class="hidden mt-8 space-y-4">
                 <div class="flex items-center justify-between">
                     <h3 class="text-sm font-semibold text-slate-300 uppercase tracking-wider">Generated Roblox QWERTY Sheet</h3>
